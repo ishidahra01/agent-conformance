@@ -74,9 +74,46 @@ export class ConformanceEngine {
       }
     }
 
+    // Check file creations in read-only paths
+    if (this.policy?.readOnlyPaths) {
+      for (const createdFile of trace.filesCreated) {
+        for (const readOnlyPath of this.policy.readOnlyPaths) {
+          if (createdFile.includes(readOnlyPath)) {
+            violations.push({
+              rule: 'no-create-in-readonly-paths',
+              severity: 'error',
+              message: `Created file in read-only path: ${createdFile}`,
+              context: `Runtime: ${trace.runtime}`,
+            });
+          }
+        }
+      }
+    }
+
+    // Check file deletions in read-only paths
+    if (this.policy?.readOnlyPaths) {
+      for (const deletedFile of trace.filesDeleted) {
+        for (const readOnlyPath of this.policy.readOnlyPaths) {
+          if (deletedFile.includes(readOnlyPath)) {
+            violations.push({
+              rule: 'no-delete-in-readonly-paths',
+              severity: 'error',
+              message: `Deleted file in read-only path: ${deletedFile}`,
+              context: `Runtime: ${trace.runtime}`,
+            });
+          }
+        }
+      }
+    }
+
     // Check disallowed paths
     if (this.policy?.disallowedPaths) {
-      for (const file of [...trace.filesRead, ...trace.filesModified]) {
+      const allAccessedFiles = [
+        ...trace.filesRead,
+        ...trace.filesModified,
+        ...trace.filesCreated,
+      ];
+      for (const file of allAccessedFiles) {
         for (const disallowedPath of this.policy.disallowedPaths) {
           if (file.includes(disallowedPath)) {
             violations.push({
@@ -90,12 +127,42 @@ export class ConformanceEngine {
       }
     }
 
+    // Check allowed paths - warn if accessing files outside allowed paths
+    if (this.policy?.allowedPaths && this.policy.allowedPaths.length > 0) {
+      const allAccessedFiles = [
+        ...trace.filesModified,
+        ...trace.filesCreated,
+        ...trace.filesDeleted,
+      ];
+      for (const file of allAccessedFiles) {
+        const isInAllowedPath = this.policy.allowedPaths.some((allowedPath) =>
+          file.includes(allowedPath)
+        );
+        if (!isInAllowedPath) {
+          warnings.push({
+            message: `Modified file outside allowed paths: ${file}`,
+            context: `Runtime: ${trace.runtime}, Allowed: ${this.policy.allowedPaths.join(', ')}`,
+          });
+        }
+      }
+    }
+
     // Warn on execution failures
     if (trace.outcome !== 'success') {
       warnings.push({
         message: `Execution did not complete successfully: ${trace.outcome}`,
         context: `Runtime: ${trace.runtime}`,
       });
+    }
+
+    // Warn if no files were modified when files were created/deleted
+    if (trace.filesCreated.length > 0 || trace.filesDeleted.length > 0) {
+      if (trace.filesModified.length === 0) {
+        warnings.push({
+          message: `Files created/deleted but no files modified (${trace.filesCreated.length} created, ${trace.filesDeleted.length} deleted)`,
+          context: `Runtime: ${trace.runtime}`,
+        });
+      }
     }
 
     return { violations, warnings };

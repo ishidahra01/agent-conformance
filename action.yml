@@ -1,0 +1,122 @@
+name: 'Agent Conformance'
+description: 'Verify how coding agents behave against repo-level instructions, skills, MCP config, and policy'
+author: 'Agent Conformance'
+branding:
+  icon: 'check-circle'
+  color: 'blue'
+
+inputs:
+  repo-path:
+    description: 'Path to the repository to scan'
+    required: false
+    default: '.'
+  task:
+    description: 'Task to execute (e.g., pr-review, docs-sync)'
+    required: false
+  runtimes:
+    description: 'Comma-separated list of runtimes to test (claude,codex)'
+    required: false
+    default: 'claude,codex'
+  report-format:
+    description: 'Report format (json, md, html)'
+    required: false
+    default: 'md'
+  output-dir:
+    description: 'Output directory for reports'
+    required: false
+    default: './conformance-reports'
+  fail-on-violations:
+    description: 'Fail the action if conformance violations are found'
+    required: false
+    default: 'true'
+
+outputs:
+  scan-result:
+    description: 'Path to the scan results file'
+  report-path:
+    description: 'Path to the generated report'
+  verdict:
+    description: 'Conformance verdict (pass, warn, fail)'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install agent-conformance
+      shell: bash
+      run: |
+        npm install -g agent-conformance || npm install -g .
+
+    - name: Scan repository
+      id: scan
+      shell: bash
+      run: |
+        mkdir -p ${{ inputs.output-dir }}
+        agent-conformance scan --repo ${{ inputs.repo-path }} --output ${{ inputs.output-dir }}/scan.json
+        echo "scan-result=${{ inputs.output-dir }}/scan.json" >> $GITHUB_OUTPUT
+
+    - name: Run conformance check
+      id: run
+      if: inputs.task != ''
+      shell: bash
+      run: |
+        IFS=',' read -ra RUNTIMES <<< "${{ inputs.runtimes }}"
+        RUNTIME_ARGS=""
+        for runtime in "${RUNTIMES[@]}"; do
+          RUNTIME_ARGS="$RUNTIME_ARGS --runtime $runtime"
+        done
+        agent-conformance run --repo ${{ inputs.repo-path }} --task ${{ inputs.task }} $RUNTIME_ARGS --output ${{ inputs.output-dir }}
+
+    - name: Generate report
+      id: report
+      if: inputs.task != ''
+      shell: bash
+      run: |
+        agent-conformance report --input ${{ inputs.output-dir }}/traces.json --format ${{ inputs.report-format }} --output ${{ inputs.output-dir }}
+        REPORT_FILE=$(ls -t ${{ inputs.output-dir }}/conformance-*.${inputs.report-format} | head -1)
+        echo "report-path=$REPORT_FILE" >> $GITHUB_OUTPUT
+
+        # Extract verdict from report
+        if [ "${{ inputs.report-format }}" = "json" ]; then
+          VERDICT=$(jq -r '.verdict' $REPORT_FILE)
+        else
+          VERDICT="unknown"
+        fi
+        echo "verdict=$VERDICT" >> $GITHUB_OUTPUT
+
+    - name: Upload conformance report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: conformance-report
+        path: ${{ inputs.output-dir }}
+
+    - name: Comment PR with report
+      if: inputs.task != '' && github.event_name == 'pull_request' && inputs.report-format == 'md'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const reportPath = '${{ steps.report.outputs.report-path }}';
+          if (fs.existsSync(reportPath)) {
+            const report = fs.readFileSync(reportPath, 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## Agent Conformance Report\n\n' + report
+            });
+          }
+
+    - name: Check verdict
+      if: inputs.task != '' && inputs.fail-on-violations == 'true'
+      shell: bash
+      run: |
+        if [ "${{ steps.report.outputs.verdict }}" = "fail" ]; then
+          echo "Conformance check failed with violations"
+          exit 1
+        fi
