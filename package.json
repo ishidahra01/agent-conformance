@@ -11,6 +11,7 @@
     "dev": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
+    "smoke-test": "bash scripts/smoke-test.sh",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "cli": "node dist/cli.js",

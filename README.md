@@ -371,6 +371,71 @@ This project should aim to be safe by default:
 * richer PR gating workflows
 * internal agent support
 
+## Quick Start
+
+### Installation
+
+```bash
+npm install -g agent-conformance
+```
+
+Or for local development:
+
+```bash
+git clone https://github.com/ishidahra01/agent-conformance.git
+cd agent-conformance
+npm install
+npm run build
+```
+
+### Usage
+
+**Scan a repository for agent assets:**
+
+```bash
+agent-conformance scan --repo .
+```
+
+**Run a task against runtimes:**
+
+```bash
+agent-conformance run --repo . --task pr-review --runtime claude --runtime codex
+```
+
+**Generate a conformance report:**
+
+```bash
+agent-conformance report --input out/traces.json --format md
+```
+
+### Try the Example
+
+Test the tool with the included example repository:
+
+```bash
+# Scan the example repo
+agent-conformance scan --repo fixtures/example-repo
+
+# Run a task (currently uses mock execution)
+agent-conformance run --repo fixtures/example-repo --task pr-review --runtime claude
+
+# Generate a report
+agent-conformance report --input out/traces.json --format md
+```
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development instructions.
+
+Quick start for development:
+
+```bash
+npm install
+npm run build    # Compile TypeScript
+npm test         # Run tests
+npm run dev      # Watch mode for development
+```
+
 ## Contributing
 
 Contributions are welcome, especially around:
@@ -381,3 +446,5 @@ Contributions are welcome, especially around:
 * trace normalization
 * sample repos / fixtures
 * report UX
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
