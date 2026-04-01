@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { RepoAssets, ClaudeAssets, CodexAssets, McpConfig, PolicyConfig } from '../types';
+import { RepoAssets, ClaudeAssets, CodexAssets, McpConfig, PolicyConfig, TaskDefinition } from '../types';
 import { logger } from '../logger';
 import { ScanError } from '../errors';
 
@@ -215,8 +215,76 @@ export class RepoScanner {
     return instructions;
   }
 
-  private extractTasks(content: string) {
-    // Simple extraction - can be enhanced with better parsing
-    return [];
+  private extractTasks(content: string): TaskDefinition[] {
+    const tasks: TaskDefinition[] = [];
+    const lines = content.split('\n');
+    let currentTask: Partial<TaskDefinition> | null = null;
+    let inConstraintsSection = false;
+    let inTasksSection = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Check if we're entering the Tasks section
+      if (line.match(/^#+\s*tasks/i)) {
+        inTasksSection = true;
+        continue;
+      }
+
+      // Exit tasks section if we hit another top-level section
+      if (inTasksSection && line.match(/^##\s+[^#]/)) {
+        inTasksSection = false;
+        if (currentTask && currentTask.name) {
+          tasks.push(currentTask as TaskDefinition);
+        }
+        currentTask = null;
+      }
+
+      if (!inTasksSection) continue;
+
+      // Task heading (### Task Name)
+      if (line.match(/^###\s+/)) {
+        // Save previous task if exists
+        if (currentTask && currentTask.name) {
+          tasks.push(currentTask as TaskDefinition);
+        }
+
+        const taskName = line.replace(/^###\s+/, '').trim();
+        currentTask = {
+          name: taskName,
+          description: '',
+          constraints: [],
+        };
+        inConstraintsSection = false;
+        continue;
+      }
+
+      if (!currentTask) continue;
+
+      // Look for constraints section
+      if (line.match(/^\*\*constraints:\*\*/i)) {
+        inConstraintsSection = true;
+        continue;
+      }
+
+      // Extract constraints (lines starting with -)
+      if (inConstraintsSection && line.match(/^-\s+/)) {
+        const constraint = line.replace(/^-\s+/, '').trim();
+        currentTask.constraints?.push(constraint);
+      }
+      // Description (non-empty lines before constraints)
+      else if (!inConstraintsSection && line.trim() && !line.match(/^[#*-]/)) {
+        currentTask.description = currentTask.description
+          ? `${currentTask.description} ${line.trim()}`
+          : line.trim();
+      }
+    }
+
+    // Add the last task if exists
+    if (currentTask && currentTask.name) {
+      tasks.push(currentTask as TaskDefinition);
+    }
+
+    return tasks;
   }
 }

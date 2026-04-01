@@ -72,4 +72,35 @@ describe('RepoScanner', () => {
     const scanner = new RepoScanner('/non/existent/path');
     await expect(scanner.scan()).rejects.toThrow('Repository path does not exist');
   });
+
+  it('should extract tasks from AGENTS.md', async () => {
+    const agentsMdContent = `# Agent Instructions
+
+## Tasks
+
+### PR Review
+Review pull requests for code quality and test coverage.
+
+**Constraints:**
+- Read-only operation
+- Must not modify any files
+
+### Docs Sync
+Update documentation.
+
+**Constraints:**
+- May only modify files under docs/
+`;
+    fs.writeFileSync(path.join(tempDir, 'AGENTS.md'), agentsMdContent);
+
+    const scanner = new RepoScanner(tempDir);
+    const assets = await scanner.scan();
+
+    expect(assets.agentsMd?.tasks).toBeDefined();
+    expect(assets.agentsMd?.tasks).toHaveLength(2);
+    expect(assets.agentsMd?.tasks?.[0].name).toBe('PR Review');
+    expect(assets.agentsMd?.tasks?.[0].description).toContain('Review pull requests');
+    expect(assets.agentsMd?.tasks?.[0].constraints).toHaveLength(2);
+    expect(assets.agentsMd?.tasks?.[1].name).toBe('Docs Sync');
+  });
 });
