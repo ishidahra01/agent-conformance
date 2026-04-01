@@ -388,25 +388,61 @@ npm install
 npm run build
 ```
 
-### Usage
+### Basic Usage
 
-**Scan a repository for agent assets:**
+**1. Scan your repository for agent assets:**
 
 ```bash
 agent-conformance scan --repo .
 ```
 
-**Run a task against runtimes:**
+This discovers and parses:
+- `AGENTS.md` with task definitions
+- `.claude/skills/` directory
+- `.mcp.json` configuration
+- `.agent-policy.json` constraints
+
+**2. Run a conformance check:**
 
 ```bash
 agent-conformance run --repo . --task pr-review --runtime claude --runtime codex
 ```
 
-**Generate a conformance report:**
+**3. Generate a report:**
 
 ```bash
 agent-conformance report --input out/traces.json --format md
 ```
+
+### Canonical Tasks
+
+The tool includes three canonical task definitions:
+
+#### PR Review
+```bash
+agent-conformance run --repo . --task pr-review --runtime claude
+```
+- **Constraint:** Read-only, no file modifications
+- **Purpose:** Automated code review
+- **Policy:** Must not modify any files
+
+#### Docs Sync
+```bash
+agent-conformance run --repo . --task docs-sync --runtime claude
+```
+- **Constraint:** Modify only `docs/` directory
+- **Purpose:** Documentation maintenance
+- **Policy:** Source code must remain unchanged
+
+#### Release Prep
+```bash
+agent-conformance run --repo . --task release-prep --runtime claude
+```
+- **Constraint:** Update versions/changelogs only
+- **Purpose:** Release automation
+- **Policy:** Production config must not change
+
+See [tasks/](tasks/) directory for detailed task specifications.
 
 ### Try the Example
 
@@ -422,6 +458,39 @@ agent-conformance run --repo fixtures/example-repo --task pr-review --runtime cl
 # Generate a report
 agent-conformance report --input out/traces.json --format md
 ```
+
+## GitHub Action
+
+Use in your workflows:
+
+```yaml
+name: Agent Conformance
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: agent-conformance/agent-conformance@v1
+        with:
+          task: 'pr-review'
+          runtimes: 'claude,codex'
+          fail-on-violations: 'true'
+```
+
+The action automatically:
+- Scans your repository
+- Runs conformance checks
+- Uploads reports as artifacts
+- Comments on PRs with results
+- Fails if violations are found
+
+See [action.yml](action.yml) for all options.
 
 ## Development
 
