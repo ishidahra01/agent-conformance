@@ -76,17 +76,23 @@ runs:
       if: inputs.task != ''
       shell: bash
       run: |
-        agent-conformance report --input ${{ inputs.output-dir }}/traces.json --format ${{ inputs.report-format }} --output ${{ inputs.output-dir }}
-        REPORT_FILE=$(ls -t ${{ inputs.output-dir }}/conformance-*.${inputs.report-format} | head -1)
+        agent-conformance report --input ${{ inputs.output-dir }}/traces.json --repo ${{ inputs.repo-path }} --format ${{ inputs.report-format }} --output ${{ inputs.output-dir }}
+
+        # Find the most recent report file
+        REPORT_FILE=$(ls -t ${{ inputs.output-dir }}/conformance-*.* | head -1)
         echo "report-path=$REPORT_FILE" >> $GITHUB_OUTPUT
 
         # Extract verdict from report
         if [ "${{ inputs.report-format }}" = "json" ]; then
-          VERDICT=$(jq -r '.verdict' $REPORT_FILE)
+          VERDICT=$(jq -r '.verdict' "$REPORT_FILE")
+        elif [ "${{ inputs.report-format }}" = "md" ]; then
+          # Extract verdict from markdown (looks for "**Verdict:** PASS/WARN/FAIL")
+          VERDICT=$(grep -oP '(?<=\*\*Verdict:\*\* )\w+' "$REPORT_FILE" || echo "unknown")
         else
           VERDICT="unknown"
         fi
         echo "verdict=$VERDICT" >> $GITHUB_OUTPUT
+        echo "Conformance verdict: $VERDICT"
 
     - name: Upload conformance report
       uses: actions/upload-artifact@v4

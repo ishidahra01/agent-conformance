@@ -113,6 +113,7 @@ program
   .command('report')
   .description('Generate conformance report from execution traces')
   .requiredOption('-i, --input <path>', 'Input traces file')
+  .requiredOption('-r, --repo <path>', 'Repository path')
   .option('-f, --format <format>', 'Report format (json, md, html)', 'md')
   .option('-o, --output <path>', 'Output directory', './out')
   .option('-v, --verbose', 'Verbose output')
@@ -125,6 +126,7 @@ program
       const fs = await import('fs');
       const inputPath = path.resolve(options.input);
       const outputDir = path.resolve(options.output);
+      const repoPath = path.resolve(options.repo);
 
       logger.info(`Generating report from ${inputPath}`);
 
@@ -143,7 +145,14 @@ program
       }
 
       const task = traces[0].task;
-      const engine = new ConformanceEngine();
+
+      // Scan repository for policy and task constraints
+      logger.info('Scanning repository for policy and task constraints');
+      const scanner = new RepoScanner(repoPath);
+      const assets = await scanner.scan();
+
+      // Create engine with policy and task constraints
+      const engine = new ConformanceEngine(assets.policy, assets.agentsMd?.tasks, task);
       const result = engine.evaluate(task, traces);
 
       const reporter = new Reporter(outputDir);
