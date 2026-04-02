@@ -84,7 +84,7 @@ export class CodexAdapter implements RuntimeAdapter {
       rawOutput = stdout + stderr;
       logger.debug(`Codex execution completed`);
     } catch (error: any) {
-      rawOutput = error.stdout || '' + error.stderr || '' + error.message;
+      rawOutput = `${error.stdout ?? ''}${error.stderr ?? ''}${error.message ?? ''}`;
 
       if (error.killed || error.signal === 'SIGTERM') {
         outcome = ExecutionOutcome.TIMEOUT;

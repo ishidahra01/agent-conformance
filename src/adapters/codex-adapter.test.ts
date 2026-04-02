@@ -65,6 +65,8 @@ describe('CodexAdapter', () => {
       expect(trace.task).toBe('test task');
       expect(trace.outcome).toBe(ExecutionOutcome.FAILURE);
       expect(trace.rawOutput).toBe('Codex CLI not available');
+      expect(execFileMock).toHaveBeenCalledTimes(1);
+      expect(execFileMock).toHaveBeenCalledWith('codex', ['--version']);
     });
 
     it('should execute successfully when CLI is available', async () => {
@@ -78,6 +80,18 @@ describe('CodexAdapter', () => {
       expect(trace.task).toBe('test task');
       expect(trace.outcome).toBe(ExecutionOutcome.SUCCESS);
       expect(trace.rawOutput).toContain('Task completed');
+      expect(execFileMock).toHaveBeenNthCalledWith(1, 'codex', ['--version']);
+      expect(execFileMock).toHaveBeenNthCalledWith(
+        2,
+        'codex',
+        ['--non-interactive', 'test task'],
+        expect.objectContaining({
+          cwd: '/tmp/test-repo',
+          timeout: 300000,
+        })
+      );
+      const envArg = (execFileMock as any).mock.calls[1][2].env;
+      expect(envArg).toMatchObject({ PATH: process.env.PATH });
     });
 
     it('should handle execution failure', async () => {
@@ -92,6 +106,8 @@ describe('CodexAdapter', () => {
 
       expect(trace.runtime).toBe(RuntimeType.CODEX);
       expect(trace.outcome).toBe(ExecutionOutcome.FAILURE);
+      expect(trace.rawOutput).toContain('Some output');
+      expect(trace.rawOutput).toContain('Error occurred');
     });
 
     it('should handle timeout', async () => {
@@ -106,6 +122,33 @@ describe('CodexAdapter', () => {
 
       expect(trace.runtime).toBe(RuntimeType.CODEX);
       expect(trace.outcome).toBe(ExecutionOutcome.TIMEOUT);
+    });
+
+    it('should pass custom options to CLI execution', async () => {
+      (execFileMock as any)
+        .mockResolvedValueOnce({ stdout: 'codex version 1.0.0', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'Task completed', stderr: '' });
+
+      const options = {
+        workingDir: '/tmp/custom-dir',
+        env: { CUSTOM_VAR: 'value' },
+        timeout: 12345,
+      };
+
+      await adapter.execute('/tmp/test-repo', 'test task', options);
+
+      expect(execFileMock).toHaveBeenNthCalledWith(
+        2,
+        'codex',
+        ['--non-interactive', 'test task'],
+        expect.objectContaining({
+          cwd: options.workingDir,
+          env: expect.objectContaining({
+            CUSTOM_VAR: 'value',
+          }),
+          timeout: options.timeout,
+        })
+      );
     });
   });
 });
