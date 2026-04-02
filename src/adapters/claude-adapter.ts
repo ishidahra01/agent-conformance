@@ -7,6 +7,11 @@ import {
 import { RuntimeAdapter, ExecutionOptions } from './runtime-adapter';
 import { logger } from '../logger';
 import { RuntimeError } from '../errors';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { createSnapshot, compareSnapshots } from './file-tracker';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Adapter for Claude Code runtime
@@ -23,13 +28,82 @@ export class ClaudeAdapter implements RuntimeAdapter {
   ): Promise<ExecutionTrace> {
     logger.info(`Executing task "${task}" with Claude Code`);
 
+    // Check if CLI is available
+    const available = await this.isAvailable();
+    if (!available) {
+      logger.warn('Claude Code CLI not available - returning mock trace with warning');
+      const startTime = new Date();
+      const endTime = new Date();
+      const metrics: ExecutionMetrics = {
+        durationMs: endTime.getTime() - startTime.getTime(),
+      };
+
+      return {
+        runtime: RuntimeType.CLAUDE_CODE,
+        task,
+        startTime,
+        endTime,
+        filesRead: [],
+        filesModified: [],
+        filesCreated: [],
+        filesDeleted: [],
+        toolUsage: [],
+        approvalEvents: [],
+        skillsInvoked: [],
+        outcome: ExecutionOutcome.FAILURE,
+        metrics,
+        rawOutput: 'Claude Code CLI not available',
+      };
+    }
+
     const startTime = new Date();
 
-    // TODO: Implement actual Claude Code execution
-    // This is a placeholder implementation
-    logger.warn('Claude Code adapter not fully implemented - returning mock trace');
+    // Create a snapshot of the file system before execution
+    logger.debug('Creating pre-execution file snapshot');
+    const beforeSnapshot = createSnapshot(repoPath);
+
+    let rawOutput = '';
+    let outcome = ExecutionOutcome.SUCCESS;
+
+    try {
+      // Execute the Claude Code CLI
+      logger.debug('Executing Claude Code CLI');
+      const workingDir = options?.workingDir || repoPath;
+      const timeout = options?.timeout || 300000; // 5 minutes default
+
+      const { stdout, stderr } = await execFileAsync(
+        'claude',
+        ['--non-interactive', task],
+        {
+          cwd: workingDir,
+          env: { ...process.env, ...options?.env },
+          timeout,
+        }
+      );
+
+      rawOutput = stdout + stderr;
+      logger.debug(`Claude Code execution completed`);
+    } catch (error: any) {
+      rawOutput = error.stdout || '' + error.stderr || '' + error.message;
+
+      if (error.killed || error.signal === 'SIGTERM') {
+        outcome = ExecutionOutcome.TIMEOUT;
+        logger.error('Claude Code execution timed out');
+      } else {
+        outcome = ExecutionOutcome.FAILURE;
+        logger.error(`Claude Code execution failed: ${error.message}`);
+      }
+    }
 
     const endTime = new Date();
+
+    // Create a snapshot of the file system after execution
+    logger.debug('Creating post-execution file snapshot');
+    const afterSnapshot = createSnapshot(repoPath);
+
+    // Compare snapshots to determine file changes
+    const fileChanges = compareSnapshots(beforeSnapshot, afterSnapshot);
+
     const metrics: ExecutionMetrics = {
       durationMs: endTime.getTime() - startTime.getTime(),
     };
@@ -39,21 +113,28 @@ export class ClaudeAdapter implements RuntimeAdapter {
       task,
       startTime,
       endTime,
-      filesRead: [],
-      filesModified: [],
-      filesCreated: [],
-      filesDeleted: [],
+      filesRead: fileChanges.filesRead,
+      filesModified: fileChanges.filesModified,
+      filesCreated: fileChanges.filesCreated,
+      filesDeleted: fileChanges.filesDeleted,
       toolUsage: [],
       approvalEvents: [],
       skillsInvoked: [],
-      outcome: ExecutionOutcome.SUCCESS,
+      outcome,
       metrics,
+      rawOutput,
     };
   }
 
   async isAvailable(): Promise<boolean> {
-    // TODO: Check if Claude Code CLI is available
     logger.debug('Checking Claude Code availability');
-    return false;
+    try {
+      await execFileAsync('claude', ['--version']);
+      logger.debug('Claude Code CLI is available');
+      return true;
+    } catch (error) {
+      logger.debug('Claude Code CLI not found');
+      return false;
+    }
   }
 }
