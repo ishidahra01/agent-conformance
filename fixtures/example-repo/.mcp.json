@@ -1,0 +1,12 @@
+{
+  "servers": [
+    {
+      "name": "docs-search",
+      "endpoint": "http://localhost:3001",
+      "config": {
+        "indexPath": "./docs"
+      }
+    }
+  ],
+  "tools": ["search_docs", "list_files"]
+}

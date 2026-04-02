@@ -1,0 +1,6 @@
+{
+  "readOnlyPaths": ["config/production/", "secrets/"],
+  "disallowedPaths": ["secrets/", ".env", "*.key"],
+  "allowedPaths": ["docs/", "src/", "tests/", "README.md"],
+  "requiredApprovals": ["file_write", "git_push", "npm_publish"]
+}

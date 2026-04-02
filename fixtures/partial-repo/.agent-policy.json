@@ -1,0 +1,4 @@
+{
+  "readOnlyPaths": ["config/"],
+  "disallowedPaths": ["secrets/"]
+}

@@ -1,0 +1,5 @@
+{
+  "autoApprove": false,
+  "requireConfirmation": true,
+  "allowedCommands": ["git", "npm test", "npm run lint"]
+}

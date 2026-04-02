@@ -371,6 +371,140 @@ This project should aim to be safe by default:
 * richer PR gating workflows
 * internal agent support
 
+## Quick Start
+
+### Installation
+
+```bash
+npm install -g agent-conformance
+```
+
+Or for local development:
+
+```bash
+git clone https://github.com/ishidahra01/agent-conformance.git
+cd agent-conformance
+npm install
+npm run build
+```
+
+### Basic Usage
+
+**1. Scan your repository for agent assets:**
+
+```bash
+agent-conformance scan --repo .
+```
+
+This discovers and parses:
+- `AGENTS.md` with task definitions
+- `.claude/skills/` directory
+- `.mcp.json` configuration
+- `.agent-policy.json` constraints
+
+**2. Run a conformance check:**
+
+```bash
+agent-conformance run --repo . --task pr-review --runtime claude --runtime codex
+```
+
+**3. Generate a report:**
+
+```bash
+agent-conformance report --input out/traces.json --format md
+```
+
+### Canonical Tasks
+
+The tool includes three canonical task definitions:
+
+#### PR Review
+```bash
+agent-conformance run --repo . --task pr-review --runtime claude
+```
+- **Constraint:** Read-only, no file modifications
+- **Purpose:** Automated code review
+- **Policy:** Must not modify any files
+
+#### Docs Sync
+```bash
+agent-conformance run --repo . --task docs-sync --runtime claude
+```
+- **Constraint:** Modify only `docs/` directory
+- **Purpose:** Documentation maintenance
+- **Policy:** Source code must remain unchanged
+
+#### Release Prep
+```bash
+agent-conformance run --repo . --task release-prep --runtime claude
+```
+- **Constraint:** Update versions/changelogs only
+- **Purpose:** Release automation
+- **Policy:** Production config must not change
+
+See [tasks/](tasks/) directory for detailed task specifications.
+
+### Try the Example
+
+Test the tool with the included example repository:
+
+```bash
+# Scan the example repo
+agent-conformance scan --repo fixtures/example-repo
+
+# Run a task (currently uses mock execution)
+agent-conformance run --repo fixtures/example-repo --task pr-review --runtime claude
+
+# Generate a report
+agent-conformance report --input out/traces.json --format md
+```
+
+## GitHub Action
+
+Use in your workflows:
+
+```yaml
+name: Agent Conformance
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: agent-conformance/agent-conformance@v1
+        with:
+          task: 'pr-review'
+          runtimes: 'claude,codex'
+          fail-on-violations: 'true'
+```
+
+The action automatically:
+- Scans your repository
+- Runs conformance checks
+- Uploads reports as artifacts
+- Comments on PRs with results
+- Fails if violations are found
+
+See [action.yml](action.yml) for all options.
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development instructions.
+
+Quick start for development:
+
+```bash
+npm install
+npm run build    # Compile TypeScript
+npm test         # Run tests
+npm run dev      # Watch mode for development
+```
+
 ## Contributing
 
 Contributions are welcome, especially around:
@@ -381,3 +515,5 @@ Contributions are welcome, especially around:
 * trace normalization
 * sample repos / fixtures
 * report UX
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.

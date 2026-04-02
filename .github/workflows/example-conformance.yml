@@ -1,0 +1,36 @@
+# Agent Conformance Example Workflow
+
+name: Agent Conformance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  scan:
+    name: Scan Repository Assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        with:
+          repo-path: '.'
+          output-dir: './conformance-reports'
+
+  conformance:
+    name: Run Conformance Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        with:
+          repo-path: '.'
+          task: 'pr-review'
+          runtimes: 'claude,codex'
+          report-format: 'md'
+          fail-on-violations: 'true'
