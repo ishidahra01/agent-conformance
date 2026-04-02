@@ -64,7 +64,7 @@ fi
 # Test report command - JSON
 echo ""
 echo "Testing report command (JSON)..."
-node dist/cli.js report --input /tmp/smoke-out/traces.json --format json --output /tmp/smoke-reports > /dev/null 2>&1
+node dist/cli.js report --input /tmp/smoke-out/traces.json --repo fixtures/example-repo --format json --output /tmp/smoke-reports > /dev/null 2>&1
 if ls /tmp/smoke-reports/*.json 1> /dev/null 2>&1; then
     echo -e "${GREEN}✓ JSON report generation works${NC}"
 else
@@ -75,7 +75,7 @@ fi
 # Test report command - Markdown
 echo ""
 echo "Testing report command (Markdown)..."
-node dist/cli.js report --input /tmp/smoke-out/traces.json --format md --output /tmp/smoke-reports > /dev/null 2>&1
+node dist/cli.js report --input /tmp/smoke-out/traces.json --repo fixtures/example-repo --format md --output /tmp/smoke-reports > /dev/null 2>&1
 if ls /tmp/smoke-reports/*.md 1> /dev/null 2>&1; then
     echo -e "${GREEN}✓ Markdown report generation works${NC}"
 else
@@ -86,7 +86,7 @@ fi
 # Test report command - HTML
 echo ""
 echo "Testing report command (HTML)..."
-node dist/cli.js report --input /tmp/smoke-out/traces.json --format html --output /tmp/smoke-reports > /dev/null 2>&1
+node dist/cli.js report --input /tmp/smoke-out/traces.json --repo fixtures/example-repo --format html --output /tmp/smoke-reports > /dev/null 2>&1
 if ls /tmp/smoke-reports/*.html 1> /dev/null 2>&1; then
     echo -e "${GREEN}✓ HTML report generation works${NC}"
 else
